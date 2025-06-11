@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Report Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffebee;
+        }
+        
+        h1 {
+            color: #1a237e;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(26, 35, 126, 0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #1a237e;
+            font-weight: bold;
+        }
+        
+        select, input[type="file"], .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #1a237e;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            color: #1a237e;
+            background-color: white;
+        }
+        
+        .upload-box {
+            border: 2px dashed #1a237e;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+            background-color: #ffebee;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #1a237e;
+        }
+        
+        .upload-box:hover {
+            border-color: #3949ab;
+            background-color: #ffcdd2;
+        }
+        
+        button {
+            background-color: #1a237e;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background-color: #3949ab;
+        }
+
+        .secondary-button {
+            background-color: #ffcdd2;
+            color: #1a237e;
+            border: 2px solid #1a237e;
+        }
+
+        .secondary-button:hover {
+            background-color: #ffebee;
+        }
+        
+        .error {
+            color: #c62828;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #ffebee;
+            border-radius: 5px;
+            border: 1px solid #ef9a9a;
+        }
+        
+        .success {
+            color: #1b5e20;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #ffebee;
+            border-radius: 5px;
+            border: 1px solid #a5d6a7;
+        }
+
+        .filename {
+            color: #1a237e;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            color: #1a237e;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .button-group button {
+            margin: 0;
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Billing Report Generator</h1>
+        
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+        
+        <form id="uploadForm" method="POST" enctype="multipart/form-data" action="{% url 'reports:generate_report' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="client">Select Client:</label>
+                <select name="client" id="client" required>
+                    <option value="">Choose a client...</option>
+                    {% for client in clients %}
+                    <option value="{{ client }}">{{ client }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- File upload sections - hidden by default -->
+            <div id="file_upload_section" style="display: none;">
+                <!-- Tysers specific files -->
+                <div id="tysers_files" style="display: none;">
+                    <div class="form-group">
+                        <label>Data Usage Summary CSV File:</label>
+                        <div class="upload-box" onclick="document.getElementById('data_usage_file').click()">
+                            <p>Click to upload or drag and drop Data Usage Summary CSV file</p>
+                            <input type="file" name="data_usage_file" id="data_usage_file" accept=".csv" style="display: none">
+                            <p id="data_usage_filename" class="filename"></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pre Tax Amount (£) (Found on Zoey):</label>
+                        <input type="number" name="pre_tax_amount" id="pre_tax_amount" step="0.01" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Total Tax Amount (£) (Found on Zoey):</label>
+                        <input type="number" name="total_tax_amount" id="total_tax_amount" step="0.01" class="form-control">
+                    </div>
+                </div>
+
+                <!-- ConvaTec UK specific files -->
+                <div id="convatec_uk_files" style="display: none;">
+                    <div class="form-group">
+                        <label>Service Breakdown - ConvaTec Limited:</label>
+                        <div class="upload-box" onclick="document.getElementById('convatec_limited_file').click()">
+                            <p>Click to upload or drag and drop ConvaTec Limited Service Breakdown CSV file</p>
+                            <input type="file" name="convatec_limited_file" id="convatec_limited_file" accept=".csv" style="display: none">
+                            <p id="convatec_limited_filename" class="filename"></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Service Breakdown - ConvaTec PLC:</label>
+                        <div class="upload-box" onclick="document.getElementById('convatec_plc_file').click()">
+                            <p>Click to upload or drag and drop ConvaTec PLC Service Breakdown CSV file</p>
+                            <input type="file" name="convatec_plc_file" id="convatec_plc_file" accept=".csv" style="display: none">
+                            <p id="convatec_plc_filename" class="filename"></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>List of Services Report:</label>
+                        <div class="upload-box" onclick="document.getElementById('list_of_services_file').click()">
+                            <p>Click to upload or drag and drop List of Services Report CSV file</p>
+                            <input type="file" name="list_of_services_file" id="list_of_services_file" accept=".csv" style="display: none">
+                            <p id="list_of_services_filename" class="filename"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ConvaTec iPad specific files -->
+                <div id="convatec_ipad_files" style="display: none;">
+                    <div class="form-group">
+                        <label>Service Breakdown - iPad Project:</label>
+                        <div class="upload-box" onclick="document.getElementById('ipad_project_file').click()">
+                            <p>Click to upload or drag and drop iPad Project Service Breakdown CSV file</p>
+                            <input type="file" name="ipad_project_file" id="ipad_project_file" accept=".csv" style="display: none">
+                            <p id="ipad_project_filename" class="filename"></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Service Breakdown - iPad Europe:</label>
+                        <div class="upload-box" onclick="document.getElementById('ipad_europe_file').click()">
+                            <p>Click to upload or drag and drop iPad Europe Service Breakdown CSV file</p>
+                            <input type="file" name="ipad_europe_file" id="ipad_europe_file" accept=".csv" style="display: none">
+                            <p id="ipad_europe_filename" class="filename"></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>List of Services - iPad Europe:</label>
+                        <div class="upload-box" onclick="document.getElementById('ipad_europe_services_file').click()">
+                            <p>Click to upload or drag and drop iPad Europe List of Services CSV file</p>
+                            <input type="file" name="ipad_europe_services_file" id="ipad_europe_services_file" accept=".csv" style="display: none">
+                            <p id="ipad_europe_services_filename" class="filename"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>List of Services - iPad UK:</label>
+                        <div class="upload-box" onclick="document.getElementById('ipad_uk_services_file').click()">
+                            <p>Click to upload or drag and drop iPad UK List of Services CSV file</p>
+                            <input type="file" name="ipad_uk_services_file" id="ipad_uk_services_file" accept=".csv" style="display: none">
+                            <p id="ipad_uk_services_filename" class="filename"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Common files for all clients except ConvaTec UK -->
+                <div id="common_files">
+                    <div class="form-group">
+                        <label>Usage CSV File:</label>
+                        <div class="upload-box" onclick="document.getElementById('usage_file').click()">
+                            <p>Click to upload or drag and drop Usage CSV file</p>
+                            <input type="file" name="usage_file" id="usage_file" accept=".csv" style="display: none">
+                            <p id="usage_filename" class="filename"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Service Breakdown CSV File:</label>
+                        <div class="upload-box" onclick="document.getElementById('service_file').click()">
+                            <p>Click to upload or drag and drop Service Breakdown CSV file</p>
+                            <input type="file" name="service_file" id="service_file" accept=".csv" style="display: none">
+                            <p id="service_filename" class="filename"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit">Generate Billing Report</button>
+                <button type="button" class="secondary-button" onclick="resetForm()">
+                    <i class="fas fa-sync-alt"></i> Reset Form
+                </button>
+                <button type="button" id="openReportBtn" style="display: none;" onclick="openReport()">
+                    <i class="fas fa-folder-open"></i> Open Report
+                </button>
+            </div>
+        </form>
+        
+        <div id="loading">Generating report...</div>
+    </div>
+
+    <script>
+        // Client selection change handler
+        document.getElementById('client').addEventListener('change', function() {
+            const fileUploadSection = document.getElementById('file_upload_section');
+            const tysersFiles = document.getElementById('tysers_files');
+            const convatecUkFiles = document.getElementById('convatec_uk_files');
+            const convatecIpadFiles = document.getElementById('convatec_ipad_files');
+            const commonFiles = document.getElementById('common_files');
+            const dataUsageInput = document.getElementById('data_usage_file');
+            const preTaxInput = document.getElementById('pre_tax_amount');
+            const totalTaxInput = document.getElementById('total_tax_amount');
+            const usageInput = document.getElementById('usage_file');
+            const serviceInput = document.getElementById('service_file');
+            const convatecLimitedInput = document.getElementById('convatec_limited_file');
+            const convatecPlcInput = document.getElementById('convatec_plc_file');
+            const listOfServicesInput = document.getElementById('list_of_services_file');
+            const ipadProjectInput = document.getElementById('ipad_project_file');
+            const ipadEuropeInput = document.getElementById('ipad_europe_file');
+            const ipadEuropeServicesInput = document.getElementById('ipad_europe_services_file');
+            const ipadUkServicesInput = document.getElementById('ipad_uk_services_file');
+            
+            if (this.value === '') {
+                fileUploadSection.style.display = 'none';
+                tysersFiles.style.display = 'none';
+                convatecUkFiles.style.display = 'none';
+                dataUsageInput.required = false;
+                preTaxInput.required = false;
+                totalTaxInput.required = false;
+                usageInput.required = false;
+                serviceInput.required = false;
+                convatecLimitedInput.required = false;
+                convatecPlcInput.required = false;
+                listOfServicesInput.required = false;
+            } else {
+                fileUploadSection.style.display = 'block';
+                
+                if (this.value === 'Tysers') {
+                    tysersFiles.style.display = 'block';
+                    convatecUkFiles.style.display = 'none';
+                    commonFiles.style.display = 'block';
+                    dataUsageInput.required = true;
+                    preTaxInput.required = true;
+                    totalTaxInput.required = true;
+                    usageInput.required = true;
+                    serviceInput.required = true;
+                    convatecLimitedInput.required = false;
+                    convatecPlcInput.required = false;
+                    listOfServicesInput.required = false;
+                } else if (this.value === 'ConvaTec UK') {
+                    tysersFiles.style.display = 'none';
+                    convatecUkFiles.style.display = 'block';
+                    convatecIpadFiles.style.display = 'none';
+                    commonFiles.style.display = 'none';
+                    dataUsageInput.required = false;
+                    preTaxInput.required = false;
+                    totalTaxInput.required = false;
+                    usageInput.required = false;
+                    serviceInput.required = false;
+                    convatecLimitedInput.required = true;
+                    convatecPlcInput.required = true;
+                    listOfServicesInput.required = true;
+                    ipadProjectInput.required = false;
+                    ipadEuropeInput.required = false;
+                    ipadEuropeServicesInput.required = false;
+                    ipadUkServicesInput.required = false;
+                } else if (this.value === 'ConvaTec iPad') {
+                    tysersFiles.style.display = 'none';
+                    convatecUkFiles.style.display = 'none';
+                    convatecIpadFiles.style.display = 'block';
+                    commonFiles.style.display = 'none';
+                    dataUsageInput.required = false;
+                    preTaxInput.required = false;
+                    totalTaxInput.required = false;
+                    usageInput.required = false;
+                    serviceInput.required = false;
+                    convatecLimitedInput.required = false;
+                    convatecPlcInput.required = false;
+                    listOfServicesInput.required = false;
+                    ipadProjectInput.required = true;
+                    ipadEuropeInput.required = true;
+                    ipadEuropeServicesInput.required = true;
+                    ipadUkServicesInput.required = true;
+                } else {
+                    tysersFiles.style.display = 'none';
+                    convatecUkFiles.style.display = 'none';
+                    commonFiles.style.display = 'block';
+                    dataUsageInput.required = false;
+                    preTaxInput.required = false;
+                    totalTaxInput.required = false;
+                    usageInput.required = true;
+                    serviceInput.required = true;
+                    convatecLimitedInput.required = false;
+                    convatecPlcInput.required = false;
+                    listOfServicesInput.required = false;
+                }
+            }
+        });
+
+        // File input change handlers
+        document.getElementById('usage_file').addEventListener('change', function() {
+            document.getElementById('usage_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+        
+        document.getElementById('service_file').addEventListener('change', function() {
+            document.getElementById('service_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+
+        document.getElementById('data_usage_file').addEventListener('change', function() {
+            document.getElementById('data_usage_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+
+        document.getElementById('convatec_limited_file').addEventListener('change', function() {
+            document.getElementById('convatec_limited_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+
+        document.getElementById('convatec_plc_file').addEventListener('change', function() {
+            document.getElementById('convatec_plc_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+
+        document.getElementById('list_of_services_file').addEventListener('change', function() {
+            document.getElementById('list_of_services_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+        
+        // ConvaTec iPad file input change handlers
+        document.getElementById('ipad_project_file').addEventListener('change', function() {
+            document.getElementById('ipad_project_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+        
+        document.getElementById('ipad_europe_file').addEventListener('change', function() {
+            document.getElementById('ipad_europe_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+        
+        document.getElementById('ipad_europe_services_file').addEventListener('change', function() {
+            document.getElementById('ipad_europe_services_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+        
+        document.getElementById('ipad_uk_services_file').addEventListener('change', function() {
+            document.getElementById('ipad_uk_services_filename').textContent = this.files[0] ? this.files[0].name : '';
+        });
+
+        // Form submission handler
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const formData = new FormData(this);
+                const response = await fetch('{% url "reports:generate_report" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const filename = response.headers.get('Content-Disposition')?.split('filename=')[1].replace(/"/g, '') || 'report.xlsx';
+                    
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'success';
+                    successDiv.textContent = 'Report generated successfully!';
+                    
+                    const existingSuccess = document.querySelector('.success');
+                    const existingError = document.querySelector('.error');
+                    
+                    if (existingSuccess) existingSuccess.remove();
+                    if (existingError) existingError.remove();
+                    
+                    document.querySelector('.container').insertBefore(successDiv, document.getElementById('uploadForm'));
+                    
+                    // Show the Open Report button
+                    document.getElementById('openReportBtn').style.display = 'block';
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Error generating report');
+                }
+            } catch (error) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.textContent = error.message || 'Error processing files';
+                
+                const existingError = document.querySelector('.error');
+                if (existingError) existingError.remove();
+                
+                document.querySelector('.container').insertBefore(errorDiv, document.getElementById('uploadForm'));
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        // Reset form function
+        function resetForm() {
+            document.getElementById('uploadForm').reset();
+            document.getElementById('file_upload_section').style.display = 'none';
+            document.getElementById('tysers_files').style.display = 'none';
+            document.getElementById('convatec_uk_files').style.display = 'none';
+            document.getElementById('convatec_ipad_files').style.display = 'none';
+            document.getElementById('usage_filename').textContent = '';
+            document.getElementById('service_filename').textContent = '';
+            document.getElementById('data_usage_filename').textContent = '';
+            document.getElementById('convatec_limited_filename').textContent = '';
+            document.getElementById('convatec_plc_filename').textContent = '';
+            document.getElementById('list_of_services_filename').textContent = '';
+            document.getElementById('ipad_project_filename').textContent = '';
+            document.getElementById('ipad_europe_filename').textContent = '';
+            document.getElementById('ipad_europe_services_filename').textContent = '';
+            document.getElementById('ipad_uk_services_filename').textContent = '';
+            document.getElementById('openReportBtn').style.display = 'none';
+            
+            const messages = document.querySelectorAll('.success, .error');
+            messages.forEach(msg => msg.remove());
+        }
+
+        // Open Report function
+        function openReport() {
+            fetch('{% url "reports:open_report" %}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'error') {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+        
+        // Drag and drop functionality
+        const uploadBoxes = document.querySelectorAll('.upload-box');
+        
+        uploadBoxes.forEach(box => {
+            box.addEventListener('dragover', e => {
+                e.preventDefault();
+                box.style.backgroundColor = '#ffcdd2';
+            });
+            
+            box.addEventListener('dragleave', e => {
+                e.preventDefault();
+                box.style.backgroundColor = '#ffebee';
+            });
+            
+            box.addEventListener('drop', e => {
+                e.preventDefault();
+                box.style.backgroundColor = '#ffebee';
+                
+                const input = box.querySelector('input[type="file"]');
+                const files = e.dataTransfer.files;
+                
+                if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                    input.files = files;
+                    const event = new Event('change');
+                    input.dispatchEvent(event);
+                }
+            });
+        });
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</body>
+</html>
